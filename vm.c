@@ -23,7 +23,7 @@
 #define PAGE_COUNT 256    // QUANTIDADE DE PÁGINAS DENTRO DA MEMÓRIA SECUNDÁRIA
 #define MEMORY_SIZE 65536 // TAMANHO TOTAL DA MEMÓRIA SECUNDÁRIA
 
-#define ALGORITHM_TYPE 0
+int ALGORITHM_TYPE = 0;
 
 // BACKING_STORE.bin é a memória secundária, arquivo binário.
 // Ele tem 256 páginas e cada página tem 256 bytes e cada byte representa uma instrução.
@@ -54,6 +54,7 @@ typedef struct Frame
     int hits; // Acessos a este frame
 
     struct Frame *next; // Próximo frame da fila
+    struct Frame *prev; // Próximo frame da fila
 } Frame;
 
 // Estrutura da TLB (Algoritimo de subistituição de páginas para a TLB deverá ser um FIFO)
@@ -182,8 +183,6 @@ void dequeue_frame(Frame **head, Frame **tail)
 {
     Frame *aux;
 
-    int n;
-
     if ((*head) != NULL)
     {
 
@@ -224,8 +223,6 @@ void enqueue_page(Page **head, Page **tail, Page *page)
 void dequeue_page(Page **head, Page **tail)
 {
     Page *aux;
-
-    int n;
 
     if ((*head) != NULL)
     {
@@ -295,6 +292,78 @@ void fifo_enqueue_frame(Frame **head, Frame **tail, Page *page)
     physical_memory_counter++;
 }
 
+void lru_dequeue_frame(Frame **head, Frame **tail) {
+    // Caso especial: fila vazia
+    if (*head == NULL) {
+        return;
+    }
+
+    // Encontra o menor valor de hits em toda a lista
+    Frame *temp = *head;
+    int min_hits = temp->hits;
+
+    while (temp != NULL) {
+        if (temp->hits < min_hits) {
+            min_hits = temp->hits;
+        }
+        temp = temp->next;
+    }
+
+    // Encontra e remove o primeiro frame com hits igual ao menor valor encontrado
+    Frame *prev = NULL;
+    temp = *head;
+
+    while (temp != NULL) {
+        if (temp->hits == min_hits) {
+            // Se o frame a ser removido é o primeiro da lista
+            if (temp == *head) {
+                *head = temp->next;
+                // Se o frame a ser removido é também o último da lista
+                if (temp == *tail) {
+                    *tail = NULL;
+                }
+            } else {
+                prev->next = temp->next;
+                // Se o frame a ser removido é o último da lista
+                if (temp == *tail) {
+                    *tail = prev;
+                }
+            }
+            free(temp);
+            return;
+        }
+        prev = temp;
+        temp = temp->next;
+    }
+}
+
+void lru_enqueue_frame(Frame **head, Frame **tail, Page *page)
+{
+    lru_dequeue_frame(head, tail);
+
+    if ((*tail)->id == 127)
+    {
+        physical_memory_counter = 0;
+    }
+
+    Frame *new_frame = (Frame *)malloc(sizeof(Frame));
+
+    if (new_frame != NULL)
+    {
+        new_frame->linked_page = page->number;
+        new_frame->page = page;
+        new_frame->hits = 1;
+        new_frame->id = physical_memory_counter;
+        new_frame->next = NULL;
+
+        (*tail)->next = new_frame;
+        *tail = new_frame;
+    }
+
+    // Incrementando o id para o próximo.
+    physical_memory_counter++;
+}
+
 void printFila(FILE *p, Frame *head)
 {
     Frame *temp = head;
@@ -303,21 +372,7 @@ void printFila(FILE *p, Frame *head)
         if (head == temp)
             fprintf(p, "HEAD -> ");
 
-        fprintf(p, "%d - %d\n", head->page->number, head->page->virtual_address);
-        head = head->next;
-    }
-    fprintf(p, "NULL\n");
-}
-
-void printFilaT(FILE *p, Page *head)
-{
-    Page *temp = head;
-    while (head != NULL)
-    {
-        if (head == temp)
-            fprintf(p, "HEAD -> ");
-
-        fprintf(p, "%d\n", head->number);
+        fprintf(p, "%d (%d) ->", head->linked_page, head->hits);
         head = head->next;
     }
     fprintf(p, "NULL\n");
@@ -330,6 +385,7 @@ int find_physical_index_by_page_number(Frame *head, int page_number)
         // printf(">> %d \n", head->linked_page);
         if (head->linked_page == page_number)
         {
+            head->hits++;
             return head->id;
         }
 
@@ -450,9 +506,16 @@ void read_virtual_addresses(char *filename)
 
             if (memory_space == 128)
             {
-                fifo_enqueue_frame(&head, &tail, page);
+                if (ALGORITHM_TYPE)
+                {
+                    lru_enqueue_frame(&head, &tail, page);
+                    printFila(d,head);
+                }
+                else
+                {
+                    fifo_enqueue_frame(&head, &tail, page);
+                }
                 // fprintf(d, "[REPLACEMENT] FIFO REPLACEMENT\n");
-                // printFila(d,head);
             }
             else
             {
@@ -463,21 +526,16 @@ void read_virtual_addresses(char *filename)
         }
 
         int physical_index = find_physical_index_by_page_number(head, page_number);
-        int tlb_number = in_tlb(tlb_head, page_number);
+        //int tlb_number = in_tlb(tlb_head, page_number);
 
         // fprintf(p, "Page Number: %d ", page_number);
         // fprintf(p, "Offset: %d ", offset_number);
         // fprintf(p, "physical_index: %d ", physical_index);
-        fprintf(p, "TLB: %d ", tlb_number);
+        //fprintf(p, "TLB: %d ", tlb_number);
         fprintf(p, "Physical address: %d ", offset_number + (physical_index * 256));
         fprintf(p, "Value: %d\n", instruction);
     }
 
-    // if (head != NULL) {
-    //     printf("%d", head->id);
-    // }
-
-    // Libera memória alocada para a linha e fecha o arquivo
     fprintf(p, "Number of Translated Addresses = %d\n", number_of_translated_addresses);
     fprintf(p, "Page Faults = %d\n", page_faults);
     fprintf(p, "Page Fault Rate = %.3f\n", (float) page_faults/number_of_translated_addresses);
@@ -486,10 +544,23 @@ void read_virtual_addresses(char *filename)
     fclose(file);
 }
 
-int main()
+int main(int argc, char *argv[])
 {
+
+    if (argc != 3)
+    {
+        printf("Usage: ./vm <address_file> <algorithm_type (lru or fifo)>\n");
+        return 1;
+    }
+
     // Variável referente ao nome do arquivo que contém endereços de memória virtual
-    char *filename = "addresses.txt";
+    char *filename = argv[1];
+
+    if (strcmp("lru", argv[2]) == 0) {
+        ALGORITHM_TYPE = 1;
+    }
+
+    //a
 
     // Realizando a leitura dos endereços
     read_virtual_addresses(filename);
