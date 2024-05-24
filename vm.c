@@ -315,21 +315,6 @@ void fifo_enqueue_frame(Frame **head, Frame **tail, Page *page)
     physical_memory_counter++;
 }
 
-int check_queue_full(Frame *head)
-{
-    while (head != NULL)
-    {
-        if (head->id == 127)
-        {
-            return 1;
-        }
-
-        head = head->next;
-    }
-
-    return 0;
-}
-
 void lru_enqueue_frame(Frame **head, Page *page) {
     // Achando o frame menos usado
     Frame *temp = *head;
@@ -445,8 +430,6 @@ void read_virtual_addresses(char *filename)
 
     // Tratamento com arquivos
     FILE *p = fopen("correct.txt", "w");
-    clear_file("debug.txt");
-    //FILE *d = fopen("debug.txt", "a");
     FILE *file = fopen(filename, "r");
 
     if (file == NULL)
@@ -492,10 +475,6 @@ void read_virtual_addresses(char *filename)
         page->offset = offset_number;
         page->value = instruction;
         page->hits = 0;
-
-        printf("%d ", page_number);
-
-        // printf("%d\n", page->number);
 
         if (in_tlb(tlb_head, page_number) == -1)
         {
@@ -546,12 +525,12 @@ void read_virtual_addresses(char *filename)
 
         int physical_index = find_physical_index_by_page_number(head, page_number);
 
-        int tlb_number = in_tlb(tlb_head, page_number);
+        //int tlb_number = in_tlb(tlb_head, page_number);
 
         // fprintf(p, "Page Number: %d ", page_number);
         // fprintf(p, "Offset: %d ", offset_number);
-        fprintf(p, "physical_index: %d ", physical_index);
-        fprintf(p, "TLB: %d ", tlb_number);
+        // fprintf(p, "physical_index: %d ", physical_index);
+        //fprintf(p, "TLB: %d ", tlb_number);
         fprintf(p, "Physical address: %d ", offset_number + (physical_index * 256));
         fprintf(p, "Value: %d\n", instruction);
     }
@@ -580,8 +559,6 @@ int main(int argc, char *argv[])
     {
         ALGORITHM_TYPE = 1;
     }
-
-    // a
 
     // Realizando a leitura dos endereços
     read_virtual_addresses(filename);
