@@ -8,8 +8,8 @@
       "args": [],
       "stopAtEntry": false,
       "externalConsole": true,
-      "cwd": "c:/Users/Claudio/dev/cesar/so",
-      "program": "c:/Users/Claudio/dev/cesar/so/build/Debug/outDebug",
+      "cwd": "c:/Users/Claudio/Desktop/virtual-memory-manager",
+      "program": "c:/Users/Claudio/Desktop/virtual-memory-manager/build/Debug/outDebug",
       "MIMode": "gdb",
       "miDebuggerPath": "gdb",
       "setupCommands": [

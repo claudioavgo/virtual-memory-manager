@@ -530,7 +530,7 @@ void read_virtual_addresses(char *filename)
         // fprintf(p, "Page Number: %d ", page_number);
         // fprintf(p, "Offset: %d ", offset_number);
         // fprintf(p, "physical_index: %d ", physical_index);
-        //fprintf(p, "TLB: %d ", tlb_number);
+        // fprintf(p, "TLB: %d ", tlb_number);
         fprintf(p, "Physical address: %d ", offset_number + (physical_index * 256));
         fprintf(p, "Value: %d\n", instruction);
     }
